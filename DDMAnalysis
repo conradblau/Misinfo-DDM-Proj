@@ -1,0 +1,459 @@
+###########################################################################
+# Project #################################################################
+###########################################################################
+
+
+###########################################################################
+# Preparation -------------------------------------------------------------
+
+if(!is.null(dev.list())) dev.off()  # clear plots
+rm(list = ls())                     # clear workspace
+gc()                                # clear memory
+cat("\f")                           # clear console
+
+
+# load packages
+library(tidyverse)
+library(rstan)
+rstan_options(auto_write = TRUE)
+library(ggplot2)
+library(HDInterval)
+
+
+set.seed(15467)
+
+###########################################################################
+# Data Import and Subsetting ----------------------------------------------
+
+# import
+data <- read_csv("data_prereg_analysis.csv")
+
+
+# subsetting
+data_true            <- filter(data, real == 1) %>% slice_sample(n = 5000) # true headlines only
+data_false           <- filter(data, real == 0) %>% slice_sample(n = 5000) # false headlines only
+
+data_prompt          <- filter(data, condition == 1) %>% slice_sample(n = 5000) # prompt-present trials only
+data_no_prompt       <- filter(data, condition == 0) %>% slice_sample(n = 5000) # prompt-absent trials only
+
+data_true_prompt     <- filter(data, real == 1, condition == 1) %>% slice_sample(n = 5000) # true headline, prompt present
+data_true_no_prompt  <- filter(data, real == 1, condition == 0) %>% slice_sample(n = 5000) # true headline, prompt absent
+data_false_prompt    <- filter(data, real == 0, condition == 1) %>% slice_sample(n = 5000) # false headline, prompt present
+data_false_no_prompt <- filter(data, real == 0, condition == 0) %>% slice_sample(n = 5000) # false headline, prompt absent
+
+
+# prepare data for rstan
+stan_data_true            <- list(N      = length(data_true$rating2),
+                                  choice = data_true$rating2,
+                                  RT     = data_true$rt,
+                                  perc_acc = data_true$perc_acc - mean(data_true$perc_acc) #zero-centered
+                                  )
+
+stan_data_false           <- list(N      = length(data_false$rating2),
+                                  choice = data_false$rating2,
+                                  RT     = data_false$rt,
+                                  perc_acc = data_false$perc_acc - mean(data_false$perc_acc) #zero-centered
+                                  )
+
+stan_data_prompt          <- list(N      = length(data_prompt$rating2),
+                                  choice = data_prompt$rating2,
+                                  RT     = data_prompt$rt,
+                                  perc_acc  = data_prompt$perc_acc
+                                  )
+stan_data_no_prompt       <- list(N      = length(data_no_prompt$rating2),
+                                  choice = data_no_prompt$rating2,
+                                  RT     = data_no_prompt$rt,
+                                  perc_acc = data_no_prompt$perc_acc 
+                                  )
+
+stan_data_true_prompt     <- list(N      = length(data_true_prompt$rating2),
+                                  choice = data_true_prompt$rating2,
+                                  RT     = data_true_prompt$rt,
+                                  perc_acc = data_true_prompt$perc_acc - mean(data_true_prompt$perc_acc)
+                                  )
+
+stan_data_true_no_prompt  <- list(N      = length(data_true_no_prompt$rating2),
+                                  choice = data_true_no_prompt$rating2,
+                                  RT     = data_true_no_prompt$rt,
+                                  perc_acc = data_true_no_prompt$perc_acc - mean(data_true_no_prompt$perc_acc)
+                                  )
+
+stan_data_false_prompt    <- list(N      = length(data_false_prompt$rating2),
+                                  choice = data_false_prompt$rating2,
+                                  RT     = data_false_prompt$rt,
+                                  perc_acc = data_false_prompt$perc_acc - mean(data_false_prompt$perc_acc)
+                                  )
+
+stan_data_false_no_prompt <- list(N      = length(data_false_no_prompt$rating2),
+                                  choice = data_false_no_prompt$rating2,
+                                  RT     = data_false_no_prompt$rt,
+                                  perc_acc = data_false_no_prompt$perc_acc - mean(data_false_no_prompt$perc_acc)
+                                  )
+
+
+###########################################################################
+# DDMs with rstan & saving output objects for later use ---------------------------------------------------------
+
+ddm_true            <- stan(data = stan_data_true           , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_true, "ddm_true.rds")
+#ddm_true <- readRDS("ddm_true.rds")
+
+ddm_false           <- stan(data = stan_data_false          , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_false, "ddm_false.rds")
+#ddm_false <- readRDS("ddm_false.rds")
+
+ddm_prompt          <- stan(data = stan_data_prompt         , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_prompt, "ddm_prompt.rds")
+#ddm_prompt <- readRDS("ddm_prompt.rds")
+
+ddm_no_prompt       <- stan(data = stan_data_no_prompt      , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_no_prompt, "ddm_no_prompt.rds")
+#ddm_no_prompt <- readRDS("ddm_no_prompt.rds")
+
+ddm_true_prompt     <- stan(data = stan_data_true_prompt    , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_true_prompt, "ddm_true_prompt.rds")
+#ddm_true_prompt <- readRDS("ddm_true_prompt.rds")
+
+ddm_true_no_prompt  <- stan(data = stan_data_true_no_prompt , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_true_no_prompt, "ddm_true_no_prompt.rds")
+#ddm_true_no_prompt <- readRDS("ddm_true.rds")
+
+ddm_false_prompt    <- stan(data = stan_data_false_prompt   , file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_false_prompt, "ddm_false_prompt.rds")
+#ddm_false_prompt <- readRDS("ddm_true.rds")
+
+ddm_false_no_prompt <- stan(data = stan_data_false_no_prompt, file = "DDM_perc_acc_edit.stan", chains = 4, cores = 4, iter = 2000)
+#saveRDS(ddm_false_no_prompt, "ddm_false_no_prompt.rds")
+#ddm_false_no_prompt <- readRDS("ddm_false_no_prompt.rds")
+
+###########################################################################
+# Condition Comparisons ---------------------------------------------------
+
+
+# True vs false headlines -------------------------------------------------
+summary(ddm_true)$summary
+summary(ddm_false)$summary
+
+means_true      <- summary(ddm_true)$summary[, "mean"]
+means_false     <- summary(ddm_false)$summary[, "mean"]
+diff_true_false <- means_true - means_false
+
+
+# plot means and confidence intervals
+params_true  <- as_tibble(rstan::extract(ddm_true , c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+params_false <- as_tibble(rstan::extract(ddm_false, c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+
+diffs_headlines <- cbind(true = params_true, false = params_false) %>% 
+  transmute(
+    boundary_sep = true.boundary_separation - false.boundary_separation,
+    drift        = true.drift               - false.drift,
+    start_point  = true.start_point         - false.start_point,
+    NDT          = true.NDT                 - false.NDT,
+    weight_drift = true.weight_drift        - false.weight_drift 
+  ) %>% 
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>% 
+  group_by(param) %>% 
+  summarize(
+    mean  = mean(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975)
+  )
+
+diffs_headlines %>% 
+  ggplot(aes(x = param, y = mean)) +
+  geom_point() +
+  geom_linerange(aes(ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_gray()
+
+# significant differences
+## boundary separation
+diff_boundary <- rstan::extract(ddm_true)$boundary_separation - rstan::extract(ddm_false)$boundary_separation
+hist(diff_boundary)
+quantile(diff_boundary, c(0.025, 0.975))
+
+## drift
+diff_drift <- rstan::extract(ddm_true)$drift - rstan::extract(ddm_false)$drift
+hist(diff_drift)
+quantile(diff_drift, c(0.025, 0.975))
+
+## starting point
+diff_start_point <- rstan::extract(ddm_true)$start_point - rstan::extract(ddm_false)$start_point
+hist(diff_start_point)
+quantile(diff_start_point, c(0.025, 0.975))
+
+## weight drift
+diff_weight_drift <- rstan::extract(ddm_true)$weight_drift - rstan::extract(ddm_false)$weight_drift
+hist(diff_weight_drift)
+quantile(diff_weight_drift, c(0.025, 0.975))
+
+
+# Prompt vs no prompt -----------------------------------------------------
+summary(ddm_prompt   )$summary
+summary(ddm_no_prompt)$summary
+
+means_prompt               <- summary(ddm_prompt   )$summary[, "mean"]
+means_no_prompt            <- summary(ddm_no_prompt)$summary[, "mean"]
+diff_prompt <- means_prompt - means_no_prompt
+
+
+# plot means and confidence intervals
+params_prompt  <- as_tibble(rstan::extract(ddm_prompt , c("boundary_separation", "start_point", "NDT", "weight_drift")))
+params_no_prompt <- as_tibble(rstan::extract(ddm_no_prompt, c("boundary_separation", "start_point", "NDT", "weight_drift")))
+
+diffs_prompt <- cbind(true = params_prompt, false = params_no_prompt) %>% 
+  transmute(
+    boundary_sep = true.boundary_separation - false.boundary_separation,
+    start_point  = true.start_point         - false.start_point,
+    NDT          = true.NDT                 - false.NDT,
+    weight_drift = true.weight_drift        - false.weight_drift
+  ) %>% 
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>% 
+  group_by(param) %>% 
+  summarize(
+    mean  = mean(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975)
+  )
+
+diffs_prompt %>% 
+  ggplot(aes(x = param, y = mean)) +
+  geom_point() +
+  geom_linerange(aes(ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_gray()
+
+
+# significant differences
+## boundary separation
+diff_boundary_prompt <- rstan::extract(ddm_prompt)$boundary_separation - rstan::extract(ddm_no_prompt)$boundary_separation
+hist(diff_boundary_prompt)
+quantile(diff_boundary_prompt, c(0.025, 0.975))
+
+## drift
+diff_drift_prompt <- rstan::extract(ddm_prompt)$drift - rstan::extract(ddm_no_prompt)$drift
+hist(diff_drift_prompt)
+quantile(diff_drift_prompt, c(0.025, 0.975))
+
+## starting point
+diff_start_point_prompt <- rstan::extract(ddm_prompt)$start_point - rstan::extract(ddm_no_prompt)$start_point
+hist(diff_start_point_prompt)
+quantile(diff_start_point_prompt, c(0.025, 0.975))
+
+## weight drift
+diff_weight_drift_prompt <- rstan::extract(ddm_prompt)$weight_drift - rstan::extract(ddm_no_prompt)$weight_drift
+hist(diff_weight_drift_prompt)
+quantile(diff_weight_drift_prompt, c(0.025, 0.975))
+
+diff_boundary_prompt <- rstan::extract(ddm_prompt)$boundary_separation - rstan::extract(ddm_no_prompt)$boundary_separation
+hist(diff_boundary_prompt)
+quantile(diff_boundary_prompt, c(0.025, 0.975))
+
+
+
+
+# True and prompt vs true and no prompt -----------------------------------
+summary(ddm_true_prompt   )$summary
+summary(ddm_true_no_prompt)$summary
+
+means_true_prompt          <- summary(ddm_true_prompt   )$summary[, "mean"]
+means_true_no_prompt       <- summary(ddm_true_no_prompt)$summary[, "mean"]
+diff_true_prompt_no_prompt <- means_true_prompt - means_true_no_prompt
+
+
+# plot means and confidence intervals
+params_true_prompt  <- as_tibble(rstan::extract(ddm_true_prompt , c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+params_true_no_prompt <- as_tibble(rstan::extract(ddm_true_no_prompt, c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+
+diffs_TP <- cbind(true = params_true_prompt, false = params_true_no_prompt) %>% 
+  transmute(
+    boundary_sep = true.boundary_separation - false.boundary_separation,
+    start_point  = true.start_point         - false.start_point,
+    NDT          = true.NDT                 - false.NDT,
+    weight_drift = true.weight_drift        - false.weight_drift 
+  ) %>% 
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>% 
+  group_by(param) %>% 
+  summarize(
+    mean  = mean(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975)
+  )
+
+diffs_TP %>% 
+  ggplot(aes(x = param, y = mean)) +
+  geom_point() +
+  geom_linerange(aes(ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_gray()
+
+
+
+# significant differences
+## boundary separation
+diff_boundary_TP <- rstan::extract(ddm_true_prompt)$boundary_separation - rstan::extract(ddm_true_no_prompt)$boundary_separation
+hist(diff_boundary_TP)
+quantile(diff_boundary_TP, c(0.025, 0.975))
+
+## drift
+diff_drift_TP <- rstan::extract(ddm_true_prompt)$drift - rstan::extract(ddm_true_no_prompt)$drift
+hist(diff_drift_TP)
+quantile(diff_drift_TP, c(0.025, 0.975))
+
+## starting point
+diff_start_point_TP <- rstan::extract(ddm_true_prompt)$start_point - rstan::extract(ddm_true_no_prompt)$start_point
+hist(diff_start_point_TP)
+quantile(diff_start_point_TP, c(0.025, 0.975))
+
+## weight drift
+diff_weight_drift_TP <- rstan::extract(ddm_true_prompt)$weight_drift - rstan::extract(ddm_true_no_prompt)$weight_drift
+hist(diff_weight_drift_TP)
+quantile(diff_weight_drift_TP, c(0.025, 0.975))
+
+
+
+# False and prompt vs false and no prompt ---------------------------------
+summary(ddm_false_prompt   )$summary
+summary(ddm_false_no_prompt)$summary
+
+means_false_prompt            <- summary(ddm_false_prompt   )$summary[, "mean"]
+means_false_no_prompt         <- summary(ddm_false_no_prompt)$summary[, "mean"]
+diff_false_prompt_no_prompt   <- means_false_prompt - means_false_no_prompt
+
+
+# plot means and confidence intervals
+params_false_prompt    <- as_tibble(rstan::extract(ddm_false_prompt , c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+params_false_no_prompt <- as_tibble(rstan::extract(ddm_false_no_prompt, c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+
+diffs_FP <- cbind(true = params_false_prompt, false = params_false_no_prompt) %>% 
+  transmute(
+    boundary_sep = true.boundary_separation - false.boundary_separation,
+    drift        = true.drift               - false.drift,
+    start_point  = true.start_point         - false.start_point,
+    NDT          = true.NDT                 - false.NDT,
+    weight_drift = true.weight_drift        - false.weight_drift 
+  ) %>% 
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>% 
+  group_by(param) %>% 
+  summarize(
+    mean  = mean(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975)
+  )
+
+diffs_FP %>% 
+  ggplot(aes(x = param, y = mean)) +
+  geom_point() +
+  geom_linerange(aes(ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_gray()
+
+
+
+# significant differences
+## boundary separation
+diff_boundary_FP <- rstan::extract(ddm_false_prompt)$boundary_separation - rstan::extract(ddm_false_no_prompt)$boundary_separation
+hist(diff_boundary_FP)
+quantile(diff_boundary_FP, c(0.025, 0.975))
+
+## drift
+diff_drift_FP <- rstan::extract(ddm_false_prompt)$drift - rstan::extract(ddm_false_no_prompt)$drift
+hist(diff_drift_FP)
+quantile(diff_drift_FP, c(0.025, 0.975))
+
+## starting point
+diff_start_point_FP <- rstan::extract(ddm_false_prompt)$start_point - rstan::extract(ddm_false_no_prompt)$start_point
+hist(diff_start_point_FP)
+quantile(diff_start_point_FP, c(0.025, 0.975))
+
+## weight drift
+diff_weight_drift_FP <- rstan::extract(ddm_false_prompt)$weight_drift - rstan::extract(ddm_false_no_prompt)$weight_drift
+hist(diff_weight_drift_FP)
+quantile(diff_weight_drift_FP, c(0.025, 0.975))
+
+
+
+# MAIN --> Relative Drift Prompt vs. No Prompt ------------------------------------------------
+summary(ddm_prompt   )$summary
+summary(ddm_no_prompt)$summary
+
+means_prompt               <- summary(ddm_prompt   )$summary[, "mean"]
+means_no_prompt            <- summary(ddm_no_prompt)$summary[, "mean"]
+diff_prompt <- means_prompt - means_no_prompt
+
+
+# plot means and confidence intervals
+params_prompt  <- as_tibble(rstan::extract(ddm_prompt , c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+params_no_prompt <- as_tibble(rstan::extract(ddm_no_prompt, c("boundary_separation", "drift", "start_point", "NDT", "weight_drift")))
+
+diffs_prompt <- cbind(true = params_prompt, false = params_no_prompt) %>% 
+  transmute(
+    boundary_sep = true.boundary_separation - false.boundary_separation,
+    drift        = true.drift               - false.drift,
+    start_point  = true.start_point         - false.start_point,
+    NDT          = true.NDT                 - false.NDT,
+    weight_drift = true.weight_drift        - false.weight_drift
+  ) %>% 
+  pivot_longer(
+    cols      = everything(),
+    names_to  = "param",
+    values_to = "value"
+  ) %>% 
+  group_by(param) %>% 
+  summarize(
+    mean  = mean(value),
+    lower = quantile(value, 0.025),
+    upper = quantile(value, 0.975)
+  )
+
+diffs_prompt %>% 
+  ggplot(aes(x = param, y = mean)) +
+  geom_point() +
+  geom_linerange(aes(ymin = lower, ymax = upper)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  theme_gray()
+
+
+# significant differences
+## boundary separation
+diff_boundary_prompt <- rstan::extract(ddm_prompt)$boundary_separation - rstan::extract(ddm_no_prompt)$boundary_separation
+hist(diff_boundary_prompt)
+quantile(diff_boundary_prompt, c(0.025, 0.975))
+
+## drift
+diff_drift_prompt <- rstan::extract(ddm_prompt)$drift - rstan::extract(ddm_no_prompt)$drift
+hist(diff_drift_prompt)
+quantile(diff_drift_prompt, c(0.025, 0.975))
+
+## weight drift
+diff_drift_prompt <- rstan::extract(ddm_promp)$weight_drift - rstan::extract(ddm_no_prompt)$weight_drift
+hist(diff_drift_prompt)
+quantile(diff_drift_prompt, c(0.025, 0.975))
+
+## starting point
+diff_start_point_prompt <- rstan::extract(ddm_prompt)$start_point - rstan::extract(ddm_no_prompt)$start_point
+hist(diff_start_point_prompt)
+quantile(diff_start_point_prompt, c(0.025, 0.975))
+
+## boundary sep. 
+diff_NDT_prompt <- rstan::extract(ddm_promp)$NDT - rstan::extract(ddm_no_prompt)$NDT
+hist(diff_NDT_prompt)
+quantile(diff_NDT_prompt, c(0.025, 0.975))
+
+#--------------------------------------------------------------------------------------------------------------
